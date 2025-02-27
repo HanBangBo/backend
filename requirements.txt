@@ -2,3 +2,4 @@ Django==4.2.19
 mysqlclient>=2.1.0
 gunicorn>=20.1.0
 django-cors-headers
+requests

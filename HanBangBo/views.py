@@ -231,10 +231,13 @@ def process_quiz_result(request):
             user_keywords = user_keywords.filter(source_value=source_value)
 
             # ✅ 3단계: keyword로 필터링 (최종적으로 1개의 데이터 선택)
-            user_keyword, created = user_keywords.get_or_create(
+            user_keyword, created = UserKeyword.objects.get_or_create(
+                user=user_id,  # ✅ 기존 user_id에서 user로 변경
+                source_value=source_value,
                 keyword=keyword,
                 defaults={"correct_count": 0, "incorrect_count": 0}
             )
+
 
             # ✅ 4단계: 정답 여부에 따라 정답/오답 개수 업데이트
             if is_correct:
@@ -256,15 +259,15 @@ def process_quiz_result(request):
                 else:
                     user_keyword_data[kw.keyword] = "0.00%"
 
-            # ✅ 6단계: UserChoice 업데이트 또는 생성 (source_value 기준)
-            user_choice, _ = UserChoice.objects.update_or_create(
-                source_value=source_value,
-                defaults={"userKeyword": user_keyword_data}
-            )
+            # # ✅ 6단계: UserChoice 업데이트 또는 생성 (source_value 기준)
+            # user_choice, _ = UserChoice.objects.update_or_create(
+            #     source_value=source_value,
+            #     defaults={"userKeyword": user_keyword_data}
+            # )
 
             return JsonResponse({
                 "message": "Quiz result processed successfully",
-                "userKeyword": user_choice.userKeyword
+                #"userKeyword": user_choice.userKeyword
             }, status=200)
 
         except json.JSONDecodeError:

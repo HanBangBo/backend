@@ -2,8 +2,8 @@ from django.db import models
 
 class RecentlyData(models.Model):
     type_value = models.TextField()
-    source_value = models.TextField()
-    keyword = models.TextField()
+    source_value = models.CharField(max_length=255)
+    keyword = models.CharField(max_length=255)
     quiz_content = models.TextField()
     correct = models.TextField()
     quiz_comment = models.TextField()
@@ -11,8 +11,9 @@ class RecentlyData(models.Model):
 
 
 class UserChoice(models.Model):
+    user = models.CharField(max_length=255)
     type_value = models.TextField()
-    source_value = models.TextField()
+    source_value = models.CharField(max_length=255)
     period = models.IntegerField()
     userKeyword = models.JSONField(default=dict)  # ✅ JSON 필드 유지 (MySQL 사용 시 default 제거)
 

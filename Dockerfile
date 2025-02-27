@@ -17,8 +17,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # 환경 변수 설정 (MySQL 연결 정보 설정 가능)
-ENV PYTHONUNBUFFERED 1
-ENV DJANGO_SETTINGS_MODULE be.settings  # ⚠️ settings.py 경로 확인 필요!
+ENV PYTHONUNBUFFERED=1
+ENV DJANGO_SETTINGS_MODULE=be.settings
+
+# Copy .env file to container
+COPY .env /app/.env
+
 
 # Django 마이그레이션 & Gunicorn 실행
 CMD ["sh", "-c", "python manage.py migrate && gunicorn --bind 0.0.0.0:8000 be.wsgi:application"]

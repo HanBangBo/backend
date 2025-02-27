@@ -20,13 +20,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-r_i=#%@yivje5$ctj^^icr##x_&rh9ws^o+l4j2$2m0w0rig^9'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
-
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-r_i=#%@yivje5$ctj^^icr##x_&rh9ws^o+l4j2$2m0w0rig^9')
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 
 # Application definition
 
@@ -76,12 +72,12 @@ WSGI_APPLICATION = 'be.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',  # MySQL 사용
-        'NAME': 'HanBangBo',          # 생성한 데이터베이스 이름
-        'USER': 'root',         # MySQL 사용자 이름
-        'PASSWORD': '1234',     # MySQL 비밀번호
-        'HOST': 'localhost',                   # 로컬 서버
-        'PORT': '3306',                        # 기본 MySQL 포트
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': os.getenv('DB_NAME', 'HanBangBo'),
+        'USER': os.getenv('DB_USER', 'root'),
+        'PASSWORD': os.getenv('DB_PASSWORD', '1234'),
+        'HOST': os.getenv('DB_HOST', 'mysql'),  # ✅ MySQL 컨테이너 이름 사용
+        'PORT': os.getenv('DB_PORT', '3306'),
     }
 }
 

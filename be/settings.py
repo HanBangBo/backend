@@ -39,6 +39,7 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # ✅ 프론트엔드 도메인 허용
     "https://example.com",
+    "http://3.37.189.41:3000"
 ]
 
 ROOT_URLCONF = 'be.urls'

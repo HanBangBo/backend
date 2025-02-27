@@ -1,0 +1,4 @@
+Django==5.1.6
+mysqlclient==2.2.0  # MySQL과 연결
+gunicorn==20.1.0  # WSGI 서버
+## djangorestframework==3.14.0  # Django REST API용 (필요하면 추가)

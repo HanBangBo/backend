@@ -1,5 +1,8 @@
 from django.db import models
 
+class UserValue(models.Model) :
+    user = models.CharField(max_length=255, unique=True)
+
 class RecentlyData(models.Model):
     type_value = models.TextField()
     source_value = models.CharField(max_length=255)
@@ -11,7 +14,7 @@ class RecentlyData(models.Model):
 
 
 class UserChoice(models.Model):
-    user = models.CharField(max_length=255)
+    user = models.ForeignKey(UserValue, on_delete=models.CASCADE)
     type_value = models.TextField()
     source_value = models.CharField(max_length=255)
     period = models.IntegerField()
@@ -19,7 +22,7 @@ class UserChoice(models.Model):
 
 
 class UserKeyword(models.Model):
-    user = models.CharField(max_length=255)  # ✅ VARCHAR(255)
+    user = models.ForeignKey(UserValue, on_delete=models.CASCADE)
     source_value = models.CharField(max_length=255)  # ✅ TEXT → VARCHAR(255) 변경
     keyword = models.CharField(max_length=255)  # ✅ TEXT → VARCHAR(255) 변경
     correct_count = models.IntegerField(default=0)

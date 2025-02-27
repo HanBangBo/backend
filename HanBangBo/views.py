@@ -1,7 +1,5 @@
-from django.shortcuts import render
 import json
 from django.http import JsonResponse
-from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from .models import RecentlyData, UserChoice, UserKeyword, UserValue
 
@@ -233,36 +231,60 @@ data_to_be_from_fe = {
 def process_quiz_result(request):
     if request.method == "POST":
         try:
-            # ✅ 더미 데이터 대신 실제 request.body 사용
-            data = data_to_be_from_fe
+            # ✅ JSON 데이터 받아오기 (POST 요청에서 request.body 사용)
+            data = json.loads(request.body.decode("utf-8"))
 
-            # ✅ 프론트에서 받은 데이터
-            user = UserValue.objects.get(user=data.get("user"))
-            source_value = data.get("source_value")  # 출처 정보
-            keyword = data.get("keyword")  # 키워드
-            is_correct = data.get("is_correct")  # 정답 여부 (True/False)
+            # ✅ data가 리스트인지 확인하고 리스트가 아니면 리스트로 변환
+            if not isinstance(data, list):
+                data = [data]  # 단일 객체일 경우 리스트로 변환
 
-            if not all([user, source_value, keyword, is_correct is not None]):
-                return JsonResponse({"error": "Missing required fields"}, status=400)
+            results = []  # 처리 결과 저장
 
-            # ✅ 1단계: UserKeyword에서 user + source_value + keyword 필터링
-            user_keyword, created = UserKeyword.objects.get_or_create(
-                user=user,
-                source_value=source_value,
-                keyword=keyword,
-                defaults={"correct_count": 0, "incorrect_count": 0}
-            )
+            for entry in data:
+                # ✅ 필수 필드 확인
+                required_fields = ["user", "source_value", "keyword", "is_correct"]
+                if not all(field in entry for field in required_fields):
+                    return JsonResponse({"error": "Missing required fields"}, status=400)
 
-            # ✅ 2단계: 정답 여부에 따라 정답/오답 개수 업데이트
-            if is_correct:
-                user_keyword.correct_count += 1
-            else:
-                user_keyword.incorrect_count += 1
+                try:
+                    # ✅ 프론트에서 받은 데이터
+                    user = UserValue.objects.get(user=entry["user"])
+                except UserValue.DoesNotExist:
+                    return JsonResponse({"error": f"User '{entry['user']}' does not exist"}, status=404)
 
-            user_keyword.save()
+                source_value = entry["source_value"]
+                keyword = entry["keyword"]
+                is_correct = entry["is_correct"]
+
+                # ✅ UserKeyword에서 user + source_value + keyword 필터링
+                user_keyword, created = UserKeyword.objects.get_or_create(
+                    user=user,
+                    source_value=source_value,
+                    keyword=keyword,
+                    defaults={"correct_count": 0, "incorrect_count": 0}
+                )
+
+                # ✅ 정답 여부에 따라 정답/오답 개수 업데이트
+                if is_correct:
+                    user_keyword.correct_count += 1
+                else:
+                    user_keyword.incorrect_count += 1
+
+                user_keyword.save()
+
+                # ✅ 결과 저장
+                results.append({
+                    "user": user.user,
+                    "source_value": source_value,
+                    "keyword": keyword,
+                    "correct_count": user_keyword.correct_count,
+                    "incorrect_count": user_keyword.incorrect_count,
+                    "created": created  # 새로운 데이터 생성 여부
+                })
 
             return JsonResponse({
-                "message": "Quiz result processed successfully",
+                "message": "Quiz results processed successfully",
+                "results": results
             }, status=200)
 
         except json.JSONDecodeError:

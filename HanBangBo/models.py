@@ -19,6 +19,7 @@ class UserChoice(models.Model):
     source_value = models.CharField(max_length=255)
     period = models.IntegerField()
     userKeyword = models.JSONField(default=dict)  # ✅ JSON 필드 유지 (MySQL 사용 시 default 제거)
+    source_type = models.CharField(max_length=255)
 
 
 class UserKeyword(models.Model):

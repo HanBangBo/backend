@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  web:
+    build: .
+    container_name: backend_web
+    command: /app/entrypoint.sh
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+    networks:
+      - shared_network # ✅ 프론트엔드와 같은 네트워크 사용
+
+  db:
+    image: mysql:9.2.0
+    restart: always
+    container_name: mysql_db
+    environment:
+      MYSQL_DATABASE: HanBangBo
+      MYSQL_USER: django_user
+      MYSQL_PASSWORD: django_pass
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - shared_network # ✅ 같은 네트워크 사용
+
+volumes:
+  db_data:
+
+networks:
+  shared_network:
+    external: true # ✅ 외부 네트워크를 사용하여 프론트엔드와 연결

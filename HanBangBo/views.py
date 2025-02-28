@@ -205,6 +205,7 @@ def process_quiz_result(request):
         try:
             # ✅ JSON 데이터 받아오기
             data = json.loads(request.body.decode("utf-8"))
+            print(data)
             # ✅ 필수 필드 확인
             required_fields = ["user", "quiz_id", "is_correct"]
             if not all(field in data for field in required_fields):
@@ -212,7 +213,6 @@ def process_quiz_result(request):
                 # ✅ UserValue 객체 조회 (없으면 404)
             try:
                 user = UserValue.objects.get(user=data["user"])
-                print(1)
             except UserValue.DoesNotExist:
                 return JsonResponse({"error": f"User '{data['user']}' does not exist"}, status=404)
             results = []  # 처리 결과 저장
@@ -221,7 +221,6 @@ def process_quiz_result(request):
                 # ✅ RecentlyData 객체 조회 (없으면 404)
                 try:
                     quiz_data = RecentlyData.objects.get(id=quiz_id)
-                    print(2)
                 except RecentlyData.DoesNotExist:
                     return JsonResponse({"error": f"Quiz with ID '{quiz_id}' does not exist"}, status=404)
                 source_value = quiz_data.source_value
@@ -252,6 +251,7 @@ def process_quiz_result(request):
                     "correct_count": user_keyword.correct_count,
                     "incorrect_count": user_keyword.incorrect_count
                 })
+
                 
             RecentlyData.objects.all().delete()
             return JsonResponse({
@@ -266,40 +266,3 @@ def process_quiz_result(request):
             return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Only POST method allowed"}, status=405)
-
-
-# @csrf_exempt
-# def download_and_delete_quiz_data():
-#     # CSV 파일 응답 생성
-#     response = HttpResponse(content_type='text/csv')
-#     response['Content-Disposition'] = 'attachment; filename="quiz_data.csv"'
-    
-#     writer = csv.writer(response)
-#     # CSV 헤더 작성 (필요한 필드에 따라 수정)
-#     writer.writerow(["id", "type_value", "source_value", "keyword", "quiz_content", "correct", "quiz_comment", "choices"])
-    
-#     # 데이터베이스에서 모든 RecentlyData 객체 가져오기
-#     all_data = RecentlyData.objects.all()
-    
-#     for data in all_data:
-#         # choices 필드가 리스트인 경우, 콤마로 구분하여 문자열로 변환
-#         if isinstance(data.choices, list):
-#             choices_str = ", ".join(data.choices)
-#         else:
-#             choices_str = str(data.choices)
-        
-#         writer.writerow([
-#             data.id,
-#             data.type_value,
-#             data.source_value,
-#             data.keyword,
-#             data.quiz_content,
-#             data.correct,
-#             data.quiz_comment,
-#             choices_str
-#         ])
-    
-#     # CSV 파일로 데이터를 전달한 후 데이터베이스에서 해당 데이터 삭제
-#     RecentlyData.objects.all().delete()
-    
-#     return response

@@ -1,5 +1,5 @@
-import json, requests, csv
-from django.http import JsonResponse, HttpRequest, HttpResponse
+import json, requests
+from django.http import JsonResponse, HttpRequest
 from django.views.decorators.csrf import csrf_exempt
 from .models import RecentlyData, UserChoice, UserKeyword, UserValue
 from django.views.decorators.http import require_http_methods
@@ -19,12 +19,12 @@ def receive_ai_data(external_response):
 
         for entry in data:
             # JSON 데이터에서 개별 변수 추출
-            type_value = entry.get("type_value")      # 예: "언론사" or "카테고리"
-            source_value = entry.get("source_value")
-            keyword = entry.get("keyword")            # 예: "탄핵"
+            type_value = entry.get("type_value")        # 예: "객관식" or "주관식"
+            source_value = entry.get("source_value")    # 예: "언론사" or "카테고리"
+            keyword = entry.get("keyword")              # 예: "탄핵"
             quiz_content = entry.get("quiz_content")    # 문제 텍스트
             correct_answer = entry.get("correct")       # 정답
-            quiz_comment = entry.get("quiz_comment")      # 해설
+            quiz_comment = entry.get("quiz_comment")    # 해설
             choices = entry.get("choices", [])          # 선택지 리스트
 
             # choices가 set이면 list로 변환 (JSON 직렬화 오류 방지)
@@ -49,7 +49,7 @@ def receive_ai_data(external_response):
                 choices=choices
             )
 
-            # 저장한 데이터의 정보를 결과 리스트에 추가
+            # 저장한 데이터의 정보를 결과 리스트에 추가, 콘솔로 확인하기 위해
             stored_entries.append({
                 "id": recently_data.id,
                 "type_value": recently_data.type_value,
@@ -72,7 +72,7 @@ def receive_ai_data(external_response):
         return JsonResponse({"status": "error", "message": "Invalid JSON format"}, status=400)
 
 
-# ✅ GET 요청을 생성하는 함수
+# ✅ GET 요청을 생성하는 함수, 사용자에게 문제 풀이를 위한 선택지를 받고 ai에게 함수를 호출했을 때 get 요청을 위함
 def create_get_request():
     request = HttpRequest()  # HttpRequest 객체 생성
     request.method = "GET"  # ✅ GET 요청으로 설정
@@ -80,17 +80,18 @@ def create_get_request():
 
 
 # BE -> FE API
+# ✅ AI에게 받은 문제 중 문제 풀이에 필요한 데이터를 FE에게 전달
 @csrf_exempt
 def get_all_quiz_data(source_value):  # ✅ request 제거
     try:
-        # ✅ DB에서 모든 데이터를 id 기준으로 순차적으로 가져오기
+        # ✅ DB에서 모든 데이터를 source_value(ex. 헤럴드경제) 기준으로 순차적으로 가져오기
         filtered_data = RecentlyData.objects.filter(source_value=source_value).order_by("id")
 
         # ✅ 응답 리스트 생성
         response_list = []
 
         for data in filtered_data:
-            # 기본 데이터 추가 (식별자 포함)
+            # 클라이언트에게 전달한 문제 1개
             response_data = {
                 "id": data.id,  # ✅ 식별자 포함
                 "quiz_content": data.quiz_content,
@@ -98,10 +99,11 @@ def get_all_quiz_data(source_value):  # ✅ request 제거
                 "quiz_comment": data.quiz_comment,
             }
 
-            # ✅ choices가 2개 이상이면 포함, 1개 이하이면 제외
+            # ✅ choices가 2개 이상이면 포함, 1개 이하이면 제외 -> 객관식, 주관식을 판단
             if len(data.choices) > 1:
                 response_data["choices"] = data.choices
 
+            # 문제가 저장된 리스트(10개)
             response_list.append(response_data)
 
         # ✅ 최종 JSON 응답 반환
@@ -109,18 +111,20 @@ def get_all_quiz_data(source_value):  # ✅ request 제거
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+    
 
-
+# BE -> AI
+# ✅ 사용자에게 받은 데이터를 AI에게 전달
 def send_data_to_external_api(user_choice):
-    url = "http://ec2-52-79-153-90.ap-northeast-2.compute.amazonaws.com:8000/generate_questions/"
+    url = "#"
     
     # UserChoice 데이터에서 필요한 필드만 추출하여 딕셔너리로 구성
     payload = {
-        "type_value": user_choice.type_value,
-        "source_value": user_choice.source_value,
-        "period": user_choice.period,
-        "userKeyword": user_choice.userKeyword,
-        "source_type": user_choice.source_type  # 만약 해당 필드가 있다면
+        "type_value": user_choice.type_value,       # 객관식 or 주관식
+        "source_value": user_choice.source_value,   # ex. 헤럴드경제
+        "period": user_choice.period,               # 문제 풀이에 필요한 기사의 작성 기간
+        "userKeyword": user_choice.userKeyword,     # 사용자 취약점
+        "source_type": user_choice.source_type      # 만약 해당 필드가 있다면
     }
     
     headers = {"Content-Type": "application/json"}
@@ -133,9 +137,14 @@ def send_data_to_external_api(user_choice):
     except requests.RequestException as e:
         return {"error": str(e)}
 
+
+
+# FE <-> BE
+# 사용자가 문제 풀이의 형식, 종류를 받고 해당 문제를 전달하는 일련의 과정
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])  # ✅ POST & OPTIONS 요청 허용
 def save_user_choice(request):
+
     if request.method == "POST":
         try:
             # ✅ JSON 데이터 로드
@@ -144,13 +153,16 @@ def save_user_choice(request):
             company = ["헤럴드경제", "한국경제"]
             category = ["정치", "경제", "사회", "국제", "문화", "과학"]
 
+
             # ✅ 필수 필드 확인
             required_fields = ["user", "type_value", "source_value", "period"]
             missing_fields = [field for field in required_fields if data.get(field) is None]
+
+            # 필수 데이터 중 전달되지 않은 데이터가 있다면
             if missing_fields:
                 return JsonResponse({"error": f"Missing fields: {', '.join(missing_fields)}"}, status=400)
 
-            # ✅ 데이터 변환
+            # ✅ 데이터 변환, 사용자가 전달한 데이터
             user_id = data["user"]
             type_value = data["type_value"]
             source_value = data["source_value"]
@@ -165,13 +177,13 @@ def save_user_choice(request):
             except ValueError:
                 return JsonResponse({"error": "Period must be an integer"}, status=400)
 
-            # ✅ UserValue 가져오거나 없으면 생성
+            # ✅ 해당 사용자가 UserValue에 존재하면 가져오거나 없으면 생성
             user, created = UserValue.objects.get_or_create(user=user_id)
 
             # ✅ UserKeyword에서 source_value와 user가 같은 데이터 가져오기
             keywords = UserKeyword.objects.filter(user=user, source_value=source_value)
 
-            # ✅ userKeyword JSON 데이터 구성 (키워드 3개 이상일 때만 저장)
+            # ✅ userKeyword(사용자 취약점) JSON 데이터 구성, 오답률 측정
             user_keyword_data = {
                 kw.keyword: f"{(kw.incorrect_count / (kw.correct_count + kw.incorrect_count)) * 100:.2f}%"
                 if (kw.correct_count + kw.incorrect_count) > 0 else "0.00%"
@@ -185,12 +197,13 @@ def save_user_choice(request):
                 defaults={"type_value": type_value, "period": period, "userKeyword": user_keyword_data, "source_type": source_type}
             )
 
+            # ✅ AI에게 데이터 전달
             external_response = send_data_to_external_api(user_choice)
-            print(external_response)
+            # ✅ 생성된 문제 수신
             receive_ai_data(external_response)
 
-            # ✅ `get_all_quiz_data()`를 호출하여 JSON 반환
-            return get_all_quiz_data(source_value)  # ✅ 함수 직접 호출
+            # ✅ `get_all_quiz_data()`를 호출하여 문제 데이터 JSON 반환
+            return get_all_quiz_data(source_value) 
 
         except json.JSONDecodeError:
             return JsonResponse({"error": "Invalid JSON format"}, status=400)
@@ -199,34 +212,48 @@ def save_user_choice(request):
 
     return JsonResponse({"error": "Only POST method allowed"}, status=405)
 
+
+
+# FE -> BE
+# ✅ 문제 채점
 @csrf_exempt
 def process_quiz_result(request):
+
     if request.method == "POST":
         try:
             # ✅ JSON 데이터 받아오기
             data = json.loads(request.body.decode("utf-8"))
-            print(data)
+
             # ✅ 필수 필드 확인
             required_fields = ["user", "quiz_id", "is_correct"]
+
             if not all(field in data for field in required_fields):
                 return JsonResponse({"error": "Missing required fields"}, status=400)
-                # ✅ UserValue 객체 조회 (없으면 404)
+                
+            # ✅ UserValue 객체 조회 (없으면 404)
             try:
                 user = UserValue.objects.get(user=data["user"])
             except UserValue.DoesNotExist:
                 return JsonResponse({"error": f"User '{data['user']}' does not exist"}, status=404)
+            
             results = []  # 처리 결과 저장
             _quiz, _correct = data['quiz_id'], data['is_correct']
+
             for quiz_id, is_correct in zip(_quiz, _correct):
+
                 # ✅ RecentlyData 객체 조회 (없으면 404)
                 try:
                     quiz_data = RecentlyData.objects.get(id=quiz_id)
                 except RecentlyData.DoesNotExist:
                     return JsonResponse({"error": f"Quiz with ID '{quiz_id}' does not exist"}, status=404)
+                
+                
                 source_value = quiz_data.source_value
                 keyword = quiz_data.keyword
 
+
                 # ✅ UserKeyword에서 user + source_value + keyword 필터링
+                # ✅ 채점하는 문제의 유형을 이미 사용자가 풀었던 경험이 있으면 기존 데이터를 가져오고 아니면 새로 생성
                 user_keyword, created = UserKeyword.objects.get_or_create(
                     user=user,
                     source_value=source_value,
@@ -234,7 +261,10 @@ def process_quiz_result(request):
                     defaults={"correct_count": 0, "incorrect_count": 0}
                     
                 )
+
+                # ✅ 문제 정답 여부
                 correct_result = True if is_correct[0] == "True" else False
+
                 # ✅ 정답 여부에 따라 정답/오답 개수 업데이트
                 if correct_result:
                     user_keyword.correct_count += 1
